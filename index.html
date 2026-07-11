@@ -299,6 +299,35 @@
     font-size:18px;
   }
   .race-row .stopwatch .colon{font-size:16px;}
+  .race-row .row-remove{
+    flex:0 0 auto;
+    width:30px;height:30px;
+    border-radius:8px;
+    border:1.5px solid rgba(243,239,228,0.14);
+    background:transparent;
+    color:var(--chalk-dim);
+    font-size:18px;
+    line-height:1;
+    cursor:pointer;
+    transition:.15s ease;
+  }
+  .race-row .row-remove:hover{border-color:var(--track);color:var(--track-2);}
+
+  button.add-row{
+    width:100%;
+    padding:12px;
+    margin:14px 0 20px;
+    border-radius:10px;
+    border:1.5px dashed rgba(243,239,228,0.22);
+    background:transparent;
+    color:var(--chalk-dim);
+    font-family:'Roboto Mono',monospace;
+    font-size:13px;
+    letter-spacing:.04em;
+    cursor:pointer;
+    transition:.15s ease;
+  }
+  button.add-row:hover{border-color:var(--track-2);color:var(--track-2);}
 
   .multi-result{display:none;margin-top:20px;}
   .multi-result.show{display:block;}
@@ -395,6 +424,7 @@
       </div>
 
       <div id="multi-rows"></div>
+      <button class="add-row" type="button" onclick="addMultiRow()">+ Agregar otra carrera</button>
 
       <button class="primary" onclick="calcMulti()">Calcular mis puntajes</button>
 
@@ -500,33 +530,60 @@ function calcSingle(){
 }
 
 // ---------- Multi ----------
+let multiRowCount = 0;
+
+function addMultiRow(){
+  const container = document.getElementById('multi-rows');
+  const i = multiRowCount++;
+  const div = document.createElement('div');
+  div.className = 'race-row';
+  div.dataset.rowIndex = i;
+  div.innerHTML = `
+    <span class="row-num">${container.children.length+1}</span>
+    <select id="distance-multi-${i}"></select>
+    <div class="stopwatch">
+      <input type="number" id="h-multi-${i}" min="0" max="23" placeholder="00" maxlength="2">
+      <span class="colon">:</span>
+      <input type="number" id="m-multi-${i}" min="0" max="59" placeholder="00" maxlength="2">
+      <span class="colon">:</span>
+      <input type="number" id="s-multi-${i}" min="0" max="59" placeholder="00" maxlength="2">
+    </div>
+    <button type="button" class="row-remove" title="Quitar carrera" onclick="removeMultiRow(this)">&times;</button>
+  `;
+  container.appendChild(div);
+  buildDistanceOptions(document.getElementById(`distance-multi-${i}`));
+  renumberMultiRows();
+}
+
+function removeMultiRow(btn){
+  const container = document.getElementById('multi-rows');
+  if(container.children.length <= 1) return; // dejar siempre al menos una fila
+  btn.closest('.race-row').remove();
+  renumberMultiRows();
+}
+
+function renumberMultiRows(){
+  const container = document.getElementById('multi-rows');
+  Array.from(container.children).forEach((row,idx)=>{
+    row.querySelector('.row-num').textContent = idx+1;
+    row.querySelector('.row-remove').classList.toggle('hidden', container.children.length<=1);
+  });
+}
+
 function buildMultiRows(){
   const container = document.getElementById('multi-rows');
   container.innerHTML = '';
-  for(let i=0;i<3;i++){
-    const div = document.createElement('div');
-    div.className = 'race-row';
-    div.innerHTML = `
-      <span class="row-num">${i+1}</span>
-      <select id="distance-multi-${i}"></select>
-      <div class="stopwatch">
-        <input type="number" id="h-multi-${i}" min="0" max="23" placeholder="00" maxlength="2">
-        <span class="colon">:</span>
-        <input type="number" id="m-multi-${i}" min="0" max="59" placeholder="00" maxlength="2">
-        <span class="colon">:</span>
-        <input type="number" id="s-multi-${i}" min="0" max="59" placeholder="00" maxlength="2">
-      </div>
-    `;
-    container.appendChild(div);
-    buildDistanceOptions(document.getElementById(`distance-multi-${i}`));
-  }
+  multiRowCount = 0;
+  for(let i=0;i<3;i++) addMultiRow();
 }
 
 let lastMulti = [];
 
 function calcMulti(){
+  const rows = document.querySelectorAll('#multi-rows .race-row');
   const results = [];
-  for(let i=0;i<3;i++){
+  rows.forEach(row=>{
+    const i = row.dataset.rowIndex;
     const distSel = document.getElementById(`distance-multi-${i}`);
     const t = {
       h: parseInt(document.getElementById(`h-multi-${i}`).value)||0,
@@ -534,11 +591,11 @@ function calcMulti(){
       s: parseInt(document.getElementById(`s-multi-${i}`).value)||0,
     };
     t.total = t.h*3600+t.m*60+t.s;
-    if(t.total<=0) continue; // fila vacía, se ignora
+    if(t.total<=0) return; // fila vacía, se ignora
     const distance = distSel.value;
     const pts = pointsForTime(distance, t.total);
     results.push({distance, t, pts});
-  }
+  });
   if(results.length===0){
     alert('Cargá al menos una carrera con tiempo.');
     return;
